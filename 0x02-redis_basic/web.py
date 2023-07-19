@@ -1,57 +1,22 @@
 #!/usr/bin/env python3
-
-"""
-This module provides the class Cache
-"""
-
-from functools import wraps
+""" Implementing an expiring web cache and tracker
+    obtain the HTML content of a particular URL and returns it """
 import redis
 import requests
-import requests_html
-import typing
+r = redis.Redis()
+count = 0
 
 
-def counter(method: typing.Callable):
-    """
-    Counts the calls to the input method
-    """
-
-    @wraps(method)
-    def count(self, url: str, *args, **kwargs) -> typing.Callable:
-        """
-        Caches the counts of visits to url
-        """
-        key = 'count:' + url
-        self._redis.incr(key)
-        self._redis.expire(key, 10)
-        return counter(url, *args, **kwargs)
-    return count
+def get_page(url: str) -> str:
+    """ track how many times a particular URL was accessed in the key
+        "count:{url}"
+        and cache the result with an expiration time of 10 seconds """
+    r.set(f"cached:{url}", count)
+    resp = requests.get(url)
+    r.incr(f"count:{url}")
+    r.setex(f"cached:{url}", 10, r.get(f"cached:{url}"))
+    return resp.text
 
 
-class Cache:
-    """
-    This class queries a webpage and monitors the number of visits to it
-    """
-
-    def __init__(self):
-        """
-        Initialize class
-        """
-        self._redis = redis.Redis()
-        self._redis.flushdb()
-
-    @counter
-    def get_page(self, url: str) -> str:
-        """
-        This function ses the requests module to obtain
-        the HTML content of a particular URL and returns it
-        """
-        response = requests.get(url)
-        return response.text
-
-
-if __name__ == '__main__':
-    url = 'http://www.google.com'
-    cache = Cache()
-    print(cache)
-    cache.get_page(url)
+if __name__ == "__main__":
+    get_page('http://slowwly.robertomurray.co.uk')
